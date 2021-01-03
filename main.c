@@ -1,8 +1,15 @@
 #include "main.h"
 
-unsigned int dino_collider[20] = { 27, 29, 31, 33, 35, 43, 43, 37, 35, 37, 43, 43, 31, 28, 23, 23, 15, 15, 11, 11 };
-unsigned int cactus_big_collider[12] = { 34, 34, 34, 34, 46, 46, 46, 46, 36, 36, 36, 36 };
-unsigned int cactus_small_collider[8] = { 24, 24, 33, 33, 33, 28, 28, 28 };
+unsigned short dino_collider_top[20] = { 28, 24, 22, 20, 20, 22, 24, 26, 26, 28, 41, 43, 43, 43, 43, 43, 43, 43, 43, 41 };
+unsigned short dino_collider_bottom[20] = { 27, 29, 31, 33, 35, 43, 43, 37, 35, 37, 43, 43, 31, 28, 23, 23, 15, 15, 11, 11 };
+
+unsigned short cactus_big_collider[12] = { 34, 34, 34, 34, 46, 46, 46, 46, 36, 36, 36, 36 };
+unsigned short cactus_small_collider[8] = { 24, 24, 33, 33, 33, 28, 28, 28 };
+
+unsigned short bird_fly_1_collider_top[21] = { 22, 24, 26, 28, 30, 30, 26, 36, 34, 32, 30, 28, 26, 24, 20, 18, 18, 18, 18, 18, 18 };
+unsigned short bird_fly_1_collider_bottom[21] = { 16, 16, 16, 16, 16, 16, 18, 20, 22, 24, 26, 26, 26, 26, 26, 26, 26, 24, 24, 24, 20 };
+unsigned short bird_fly_2_collider_top[21] = { 22, 24, 26, 28, 30, 30, 26, 22, 22, 22, 22, 22, 22, 22, 20, 18, 18, 18, 18, 18, 18 };
+unsigned short bird_fly_2_collider_bottom[21] = { 16, 16, 16, 16, 16, 16, 18, 20, 36, 34, 30, 28, 26, 26, 26, 26, 26, 24, 24, 24, 20 };
 
 struct regmenu_ screen_data = { 55,	1, 0, touch_handler, keypress_handler, update_screen, 0, show_screen, 0, 0 };
 
@@ -11,6 +18,8 @@ struct app_data_t* app_data;
 
 struct save_data_t data;
 struct save_data_t* data_p;
+
+//#define DEBUG_COLLISION
 
 int main(int return_screen, char** argv) {
 	init_app((void*)return_screen);
@@ -63,6 +72,7 @@ void set_initial_values() {
 
 	app_data->hi_score = data_p->score;
 	app_data->vibration = data_p->vibration;
+	app_data->map_type = data_p->map_type;
 
 	_srand(get_tick_count());
 }
@@ -157,7 +167,7 @@ void update_screen() {
 					app_data->is_cactus_show = false;
 			}
 
-			if ((1 + _rand() % 10) == 1 && !app_data->is_cactus_show) {
+			if ((1 + _rand() % 10) == 1 && !app_data->is_cactus_show && !app_data->is_bird_show) {
 				app_data->is_cactus_show = true;
 				app_data->cactus_preshow = 4;
 				app_data->cactus_x = 176;
@@ -167,6 +177,43 @@ void update_screen() {
 				else
 					app_data->cactus_type = CACTUS_BIG;
 			}
+
+
+
+			if (app_data->is_bird_show) {
+				if (app_data->bird_preshow > 0)
+					app_data->bird_preshow--;
+				else
+					app_data->bird_x -= app_data->speed;
+
+				app_data->bird_frame++;
+				if (app_data->bird_frame == 2) {
+					app_data->bird_frame = 0;
+
+					if (app_data->bird_sptite == SPRITE_BIRD_FLY_1)
+						app_data->bird_sptite = SPRITE_BIRD_FLY_2;
+					else
+						app_data->bird_sptite = SPRITE_BIRD_FLY_1;
+				}
+
+				if (app_data->bird_x < -42)
+					app_data->is_bird_show = false;
+			}
+
+			if (app_data->score > 500 && !app_data->is_bird_show && !app_data->is_cactus_show && (1 + _rand() % 15) == 1) {
+				app_data->is_bird_show = true;
+				app_data->bird_preshow = 4;
+				app_data->bird_x = 134;
+				app_data->bird_frame = 0;
+				app_data->bird_sptite = SPRITE_BIRD_FLY_1;
+
+				if ((1 + _rand() % 2) == 1)
+					app_data->bird_y = 133;
+				else
+					app_data->bird_y = 90;
+			}
+
+
 
 			app_data->cloud_x -= app_data->speed / 6;
 
@@ -188,6 +235,26 @@ void update_screen() {
 				app_data->speed += 1;
 			}
 
+			if (app_data->map_type == MAP_TYPE_CLASSIC) {
+				app_data->night_counter++;
+
+				if (app_data->night_counter >= 480) {
+					app_data->night_text_delay++;
+
+					if (app_data->night_text_delay == 2) {
+						app_data->night_text_delay = 0;
+						app_data->night_text_show = !app_data->night_text_show;
+					}
+				}
+
+				if (app_data->night_counter == 500) {
+					app_data->is_night = !app_data->is_night;
+					app_data->night_counter = 0;
+					app_data->night_text_delay = 0;
+					app_data->night_text_show = false;
+				}
+			}
+
 			#ifdef DEBUG_COLLISION
 				set_bg_color(COLOR_WHITE);
 				set_fg_color(COLOR_BLACK);
@@ -195,81 +262,277 @@ void update_screen() {
 			#endif
 
 			if (app_data->is_cactus_show) {
-				/* Collision check */
+				/* Cactus colliders check */
 
 				if (app_data->cactus_x <= 52 && app_data->cactus_x >= 12) {
 					if (app_data->cactus_type == CACTUS_BIG) {
-						for (int i = 0; i < 12; i++)
+						for (int i = 0; i < 12; i++) {
 							for (int j = (app_data->cactus_x - 12) / 2; j < 20; j++) {
-								#ifdef DEBUG_COLLISION
-									set_fg_color(COLOR_RED);
-									draw_horizontal_line(133 - app_data->jump_shift + dino_collider[j], 0, 80);
-									set_fg_color(COLOR_BLUE);
-									draw_horizontal_line(176 - cactus_big_collider[i], 0, 50);
-								#endif
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_RED);
+								draw_horizontal_line(133 - app_data->jump_shift + dino_collider_bottom[j], 0, 80);
+								set_fg_color(COLOR_BLUE);
+								draw_horizontal_line(176 - cactus_big_collider[i], 0, 50);
+#endif
 
-								if (133 - app_data->jump_shift + dino_collider[j] > 176 - cactus_big_collider[i]) {
+								if (133 - app_data->jump_shift + dino_collider_bottom[j] > 176 - cactus_big_collider[i]) {
 									handle_collision();
-									return;
+									break;
 								}
 							}
+
+							if (app_data->is_damaged)
+								break;
+						}
 					}
 
 					if (app_data->cactus_type == CACTUS_SMALL) {
-						for (int i = 0; i < 8; i++)
+						for (int i = 0; i < 8; i++) {
 							for (int j = (app_data->cactus_x - 12) / 2; j < 20; j++) {
-								#ifdef DEBUG_COLLISION
-									set_fg_color(COLOR_RED);
-									draw_horizontal_line(133 - app_data->jump_shift + dino_collider[j], 0, 80);
-									set_fg_color(COLOR_BLUE);
-									draw_horizontal_line(176 - cactus_small_collider[i], 0, 50);
-								#endif
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_RED);
+								draw_horizontal_line(133 - app_data->jump_shift + dino_collider_bottom[j], 0, 80);
+								set_fg_color(COLOR_BLUE);
+								draw_horizontal_line(176 - cactus_small_collider[i], 0, 50);
+#endif
 
-								if (133 - app_data->jump_shift + dino_collider[j] > 176 - cactus_small_collider[i]) {
+								if (133 - app_data->jump_shift + dino_collider_bottom[j] > 176 - cactus_small_collider[i]) {
 									handle_collision();
-									return;
+									break;
 								}
 							}
+
+							if (app_data->is_damaged)
+								break;
+						}
 					}
 				}
 
 				if (app_data->cactus_x <= 12 && app_data->cactus_x >= -24) {
 					if (app_data->cactus_type == CACTUS_BIG) {
-						for (int i = ((app_data->cactus_x - 12) / 2) * -1; i < 12; i++)
+						for (int i = ((app_data->cactus_x - 12) / 2) * -1; i < 12; i++) {
 							for (int j = 0; j < 20; j++) {
-								#ifdef DEBUG_COLLISION
-									set_fg_color(COLOR_RED);
-									draw_horizontal_line(133 - app_data->jump_shift + dino_collider[j], 0, 80);
-									set_fg_color(COLOR_BLUE);
-									draw_horizontal_line(176 - cactus_big_collider[i], 0, 50);
-								#endif
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_RED);
+								draw_horizontal_line(133 - app_data->jump_shift + dino_collider_bottom[j], 0, 80);
+								set_fg_color(COLOR_BLUE);
+								draw_horizontal_line(176 - cactus_big_collider[i], 0, 50);
+#endif
 
-								if (133 - app_data->jump_shift + dino_collider[j] > 176 - cactus_big_collider[i]) {
+								if (133 - app_data->jump_shift + dino_collider_bottom[j] > 176 - cactus_big_collider[i]) {
 									handle_collision();
-									return;
+									break;
 								}
 							}
+
+							if (app_data->is_damaged)
+								break;
+						}
 					}
 
 					if (app_data->cactus_type == CACTUS_SMALL) {
-						for (int i = ((app_data->cactus_x - 12) / 2) * -1; i < 8; i++)
+						for (int i = ((app_data->cactus_x - 12) / 2) * -1; i < 8; i++) {
 							for (int j = 0; j < 20; j++) {
-								#ifdef DEBUG_COLLISION
-									set_fg_color(COLOR_RED);
-									draw_horizontal_line(133 - app_data->jump_shift + dino_collider[j], 0, 80);
-									set_fg_color(COLOR_BLUE);
-									draw_horizontal_line(176 - cactus_small_collider[i], 0, 50);
-								#endif
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_RED);
+								draw_horizontal_line(133 - app_data->jump_shift + dino_collider_bottom[j], 0, 80);
+								set_fg_color(COLOR_BLUE);
+								draw_horizontal_line(176 - cactus_small_collider[i], 0, 50);
+#endif
 
-								if (133 - app_data->jump_shift + dino_collider[j] > 176 - cactus_small_collider[i]) {
+								if (133 - app_data->jump_shift + dino_collider_bottom[j] > 176 - cactus_small_collider[i]) {
 									handle_collision();
-									return;
+									break;
 								}
 							}
+
+							if (app_data->is_damaged)
+								break;
+						}
+					}
+				}
+			}
+
+			if (app_data->is_bird_show) {
+				/* Bird top colliders check */
+
+				if (app_data->bird_x <= 52 && app_data->bird_x >= 12 && (133 - app_data->jump_shift + 21 <= app_data->bird_y + 18)) {
+					if (app_data->bird_sptite == SPRITE_BIRD_FLY_1) {
+						for (int i = 0; i < 21; i++) {
+							for (int j = (app_data->bird_x - 12) / 2; j < 20; j++) {
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_RED);
+								draw_horizontal_line(133 - app_data->jump_shift + dino_collider_bottom[j], 0, 80);
+								set_fg_color(COLOR_BLUE);
+								draw_horizontal_line((app_data->bird_y + 36) - bird_fly_1_collider_top[i], 0, 70);
+#endif
+
+								if (133 - app_data->jump_shift + dino_collider_bottom[j] > (app_data->bird_y + 36) - bird_fly_1_collider_top[i]) {
+									handle_collision();
+									break;
+								}
+							}
+
+							if (app_data->is_damaged)
+								break;
+						}
+					}
+
+					if (app_data->bird_sptite == SPRITE_BIRD_FLY_2) {
+						for (int i = 0; i < 21; i++) {
+							for (int j = (app_data->bird_x - 12) / 2; j < 20; j++) {
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_RED);
+								draw_horizontal_line(133 - app_data->jump_shift + dino_collider_bottom[j], 0, 80);
+								set_fg_color(COLOR_BLUE);
+								draw_horizontal_line((app_data->bird_y + 36) - bird_fly_2_collider_top[i], 0, 70);
+#endif
+
+								if (133 - app_data->jump_shift + dino_collider_bottom[j] > (app_data->bird_y + 36) - bird_fly_2_collider_top[i]) {
+									handle_collision();
+									break;
+								}
+							}
+
+							if (app_data->is_damaged)
+								break;
+						}
 					}
 				}
 
-				/* ************** */
+				if (app_data->bird_x <= 12 && app_data->bird_x >= -24 && (133 - app_data->jump_shift + 21 <= app_data->bird_y + 18)) {
+					if (app_data->bird_sptite == SPRITE_BIRD_FLY_1) {
+						for (int i = ((app_data->bird_x - 12) / 2) * -1; i < 21; i++) {
+							for (int j = 0; j < 20; j++) {
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_RED);
+								draw_horizontal_line(133 - app_data->jump_shift + dino_collider_bottom[j], 0, 80);
+								set_fg_color(COLOR_BLUE);
+								draw_horizontal_line((app_data->bird_y + 36) - bird_fly_1_collider_top[i], 0, 70);
+#endif
+
+								if (133 - app_data->jump_shift + dino_collider_bottom[j] > (app_data->bird_y + 36) - bird_fly_1_collider_top[i]) {
+									handle_collision();
+									break;
+								}
+							}
+
+							if (app_data->is_damaged)
+								break;
+						}
+					}
+
+					if (app_data->bird_sptite == SPRITE_BIRD_FLY_2) {
+						for (int i = ((app_data->bird_x - 12) / 2) * -1; i < 21; i++) {
+							for (int j = 0; j < 20; j++) {
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_RED);
+								draw_horizontal_line(133 - app_data->jump_shift + dino_collider_bottom[j], 0, 80);
+								set_fg_color(COLOR_BLUE);
+								draw_horizontal_line((app_data->bird_y + 36) - bird_fly_2_collider_top[i], 0, 70);
+#endif
+
+								if (133 - app_data->jump_shift + dino_collider_bottom[j] > (app_data->bird_y + 36) - bird_fly_2_collider_top[i]) {
+									handle_collision();
+									break;
+								}
+							}
+
+							if (app_data->is_damaged)
+								break;
+						}
+					}
+				}
+
+				/* Bird bottom colliders check */
+
+				if (app_data->bird_x <= 52 && app_data->bird_x >= 12 && (133 - app_data->jump_shift + 21 >= app_data->bird_y + 18)) {
+					if (app_data->bird_sptite == SPRITE_BIRD_FLY_1) {
+						for (int i = 0; i < 21; i++) {
+							for (int j = (app_data->bird_x - 12) / 2; j < 20; j++) {
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_PURPLE);
+								draw_horizontal_line(176 - app_data->jump_shift - dino_collider_top[j], 0, 80);
+								set_fg_color(COLOR_AQUA);
+								draw_horizontal_line(app_data->bird_y + bird_fly_1_collider_bottom[i], 0, 70);
+#endif
+
+								if (176 - app_data->jump_shift - dino_collider_top[j] < app_data->bird_y + bird_fly_1_collider_bottom[i]) {
+									handle_collision();
+									break;
+								}
+							}
+
+							if (app_data->is_damaged)
+								break;
+						}
+					}
+
+					if (app_data->bird_sptite == SPRITE_BIRD_FLY_2) {
+						for (int i = 0; i < 21; i++) {
+							for (int j = (app_data->bird_x - 12) / 2; j < 20; j++) {
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_PURPLE);
+								draw_horizontal_line(176 - app_data->jump_shift - dino_collider_top[j], 0, 80);
+								set_fg_color(COLOR_AQUA);
+								draw_horizontal_line(app_data->bird_y + bird_fly_2_collider_bottom[i], 0, 70);
+#endif
+
+								if (176 - app_data->jump_shift - dino_collider_top[j] < app_data->bird_y + bird_fly_2_collider_bottom[i]) {
+									handle_collision();
+									break;
+								}
+							}
+
+							if (app_data->is_damaged)
+								break;
+						}
+					}
+				}
+
+				if (app_data->bird_x <= 12 && app_data->bird_x >= -24 && (133 - app_data->jump_shift + 21 >= app_data->bird_y + 18)) {
+					if (app_data->bird_sptite == SPRITE_BIRD_FLY_1) {
+						for (int i = ((app_data->bird_x - 12) / 2) * -1; i < 21; i++) {
+							for (int j = 0; j < 20; j++) {
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_PURPLE);
+								draw_horizontal_line(176 - app_data->jump_shift - dino_collider_top[j], 0, 80);
+								set_fg_color(COLOR_AQUA);
+								draw_horizontal_line(app_data->bird_y + bird_fly_1_collider_bottom[i], 0, 70);
+#endif
+
+								if (176 - app_data->jump_shift - dino_collider_top[j] < app_data->bird_y + bird_fly_1_collider_bottom[i]) {
+									handle_collision();
+									break;
+								}
+							}
+
+							if (app_data->is_damaged)
+								break;
+						}
+					}
+
+					if (app_data->bird_sptite == SPRITE_BIRD_FLY_2) {
+						for (int i = ((app_data->bird_x - 12) / 2) * -1; i < 21; i++) {
+							for (int j = 0; j < 20; j++) {
+#ifdef DEBUG_COLLISION
+								set_fg_color(COLOR_PURPLE);
+								draw_horizontal_line(176 - app_data->jump_shift - dino_collider_top[j], 0, 80);
+								set_fg_color(COLOR_AQUA);
+								draw_horizontal_line(app_data->bird_y + bird_fly_2_collider_bottom[i], 0, 70);
+#endif
+
+								if (176 - app_data->jump_shift - dino_collider_top[j] < app_data->bird_y + bird_fly_2_collider_bottom[i]) {
+									handle_collision();
+									break;
+								}
+							}
+
+							if (app_data->is_damaged)
+								break;
+						}
+					}
+				}
 			}
 
 			draw_game_screen();
@@ -287,6 +550,10 @@ void update_screen() {
 
 				draw_pause_screen();
 			}
+			break;
+
+		case SCREEN_GAME_OVER:
+			draw_game_over_screen();
 			break;
 	}
 
@@ -321,6 +588,21 @@ void touch_handler(void* param) {
 					app_data->vibration = !app_data->vibration;
 
 					data_p->vibration = app_data->vibration;
+					ElfWriteSettings(app_data->proc->index_listed, data_p, 0, sizeof(data));
+
+					if (app_data->vibration)
+						vibrate(1, 40, 300);
+
+					draw_settings_screen();
+				}
+
+				if ((gest->touch_pos_y > 50) && (gest->touch_pos_y < 80)) {
+					app_data->map_type++;
+
+					if (app_data->map_type > 2)
+						app_data->map_type = 0;
+
+					data_p->map_type = app_data->map_type;
 					ElfWriteSettings(app_data->proc->index_listed, data_p, 0, sizeof(data));
 
 					if (app_data->vibration)
@@ -382,9 +664,15 @@ void start_game() {
 	app_data->current_screen = SCREEN_GAME;
 
 	app_data->score = 0;
+	app_data->is_record = false;
 
 	app_data->speed = 18;
 	app_data->speed_counter = 0;
+
+	app_data->is_night = app_data->map_type == MAP_TYPE_NIGHT ? true : false;
+	app_data->night_counter = 0;
+	app_data->night_text_delay = 0;
+	app_data->night_text_show = false;
 
 	app_data->current_sprite = SPRITE_DINO_STEP_1;
 
@@ -395,6 +683,9 @@ void start_game() {
 
 	app_data->is_cactus_show = false;
 	app_data->cactus_preshow = 0;
+
+	app_data->is_bird_show = false;
+	app_data->bird_preshow = 0;
 
 	app_data->cloud_x = 20 + (1 + _rand() % 240);
 	app_data->cloud_y = 10 + (1 + _rand() % 15);
@@ -411,16 +702,19 @@ void start_game() {
 }
 
 void handle_collision() {
-	if (data_p->score < app_data->score) {
-		data_p->score = app_data->score;
-		ElfWriteSettings(app_data->proc->index_listed, data_p, 0, sizeof(data));
+	if (!app_data->is_damaged) {
+		app_data->is_damaged = true;
+		app_data->current_screen = SCREEN_GAME_OVER;
+
+		if (data_p->score < app_data->score) {
+			data_p->score = app_data->score;
+			app_data->is_record = true;
+			ElfWriteSettings(app_data->proc->index_listed, data_p, 0, sizeof(data));
+		}
+
+		if (app_data->vibration)
+			vibrate(1, 40, 300);
 	}
-
-	if (app_data->vibration)
-		vibrate(1, 40, 300);
-	app_data->current_screen = SCREEN_GAME_OVER;
-
-	draw_game_over_screen();
 }
 
 void draw_start_screen() {
@@ -458,56 +752,89 @@ void draw_game_screen() {
 		fill_screen_bg();
 	#endif
 
-	show_elf_res_by_id(app_data->proc->index_listed, 8, app_data->ground_x, 166);
-	show_elf_res_by_id(app_data->proc->index_listed, 8, app_data->ground_x + 176, 166);
+	if (app_data->is_night) {
+		set_bg_color(COLOR_BLACK);
+		set_fg_color(COLOR_WHITE);
+		fill_screen_bg();
+	} else {
+		set_bg_color(COLOR_WHITE);
+		set_fg_color(COLOR_BLACK);
+		fill_screen_bg();
+	}
+
+	show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_GROUND : SPRITE_GROUND, app_data->ground_x, 166);
+	show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_GROUND : SPRITE_GROUND, app_data->ground_x + 176, 166);
 
 	switch (app_data->current_sprite) {
 		case SPRITE_DINO_STEP_1:
-			show_elf_res_by_id(app_data->proc->index_listed, 1, 12, 133);
+			show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_DINO_STEP_1 : SPRITE_DINO_STEP_1, 12, 133);
 			break;
 
 		case SPRITE_DINO_STEP_2:
-			show_elf_res_by_id(app_data->proc->index_listed, 2, 12, 133);
+			show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_DINO_STEP_2 : SPRITE_DINO_STEP_2, 12, 133);
 			break;
 
 		case SPRITE_DINO_JUMP:
-			show_elf_res_by_id(app_data->proc->index_listed, 0, 12, 133 - app_data->jump_shift);
+			show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_DINO_JUMP : SPRITE_DINO_JUMP, 12, 133 - app_data->jump_shift);
 			break;
 	}
 
 	if ((app_data->cactus_preshow % 2) == 1)
 		switch (app_data->cactus_type) {
 			case CACTUS_BIG:
-				show_elf_res_by_id(app_data->proc->index_listed, 15, 152, 130);
+				show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_CACTUS_BIG_PRESHOW : SPRITE_CACTUS_BIG_PRESHOW, 152, 130);
 				break;
 
 			case CACTUS_SMALL:
-				show_elf_res_by_id(app_data->proc->index_listed, 16, 158, 143);
+				show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_CACTUS_SMALL_PRESHOW : SPRITE_CACTUS_SMALL_PRESHOW, 158, 143);
 				break;
 		}
 
 	if (app_data->is_cactus_show && app_data->cactus_preshow == 0)
 		switch (app_data->cactus_type) {
 			case CACTUS_BIG:
-				show_elf_res_by_id(app_data->proc->index_listed, 4, app_data->cactus_x, 130);
+				show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_CACTUS_BIG : SPRITE_CACTUS_BIG, app_data->cactus_x, 130);
 				break;
 
 			case CACTUS_SMALL:
-				show_elf_res_by_id(app_data->proc->index_listed, 5, app_data->cactus_x, 143);
+				show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_CACTUS_SMALL : SPRITE_CACTUS_SMALL, app_data->cactus_x, 143);
 				break;
 		}
 
-	//repaint_screen_lines(73, 176);
+	if ((app_data->bird_preshow % 2) == 1)
+		show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_BIRD_PRESHOW : SPRITE_BIRD_PRESHOW, 134, app_data->bird_y);
 
+	if (app_data->is_bird_show && app_data->bird_preshow == 0)
+		switch (app_data->bird_sptite) {
+			case SPRITE_BIRD_FLY_1:
+				show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_BIRD_FLY_1 : SPRITE_BIRD_FLY_1, app_data->bird_x, app_data->bird_y);
+				break;
+			case SPRITE_BIRD_FLY_2:
+				show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_BIRD_FLY_2 : SPRITE_BIRD_FLY_2, app_data->bird_x, app_data->bird_y);
+				break;
+		}
+
+	#ifdef BipEmulator
+		//repaint_screen_lines(73, 176);
+	#endif
+
+	
+	_sprintf(score, "HI %.5d", data_p->score);
+	text_out(score, 8, 8);
 	_sprintf(score, "%.5d", app_data->score);
 	text_out(score, 124, 8);
 
-	show_elf_res_by_id(app_data->proc->index_listed, 6, app_data->cloud_x, app_data->cloud_y);
+	if (app_data->night_text_show) 
+		text_out_center(app_data->is_night ? "A DAY HAS COMING" : "A NIGHT HAS COMING", 88, 30);
 
-	//repaint_screen_lines(8, 18);
-	//repaint_screen_lines(8, 38);
+	show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_CLOUD : SPRITE_CLOUD, app_data->cloud_x, app_data->cloud_y);
 
-	//repaint_screen_lines(1, 176);
+	#ifdef BipEmulator
+		//repaint_screen_lines(8, 18);
+		//repaint_screen_lines(8, 38);
+
+		repaint_screen_lines(1, 176);
+	#endif
 }
 
 void draw_pause_screen() {
@@ -535,30 +862,52 @@ void draw_pause_screen() {
 void draw_game_over_screen() {
 	char score[10];
 
-	set_bg_color(COLOR_WHITE);
-	set_fg_color(COLOR_BLACK);
-	fill_screen_bg();
+	if (app_data->is_night) {
+		set_bg_color(COLOR_BLACK);
+		set_fg_color(COLOR_WHITE);
+		fill_screen_bg();
+	} else {
+		set_bg_color(COLOR_WHITE);
+		set_fg_color(COLOR_BLACK);
+		fill_screen_bg();
+	}
 
-	text_out_center("Game over!", 88, 25);
+	if (app_data->is_record) 
+		text_out_center("New record!", 88, 25);
+	else 
+		text_out_center("Game over!", 88, 25);
+
 	_sprintf(score, "Your score: %d", app_data->score);
 	text_out_center(score, 88, 43);
 
-	show_elf_res_by_id(app_data->proc->index_listed, 8, app_data->ground_x, 166);
-	show_elf_res_by_id(app_data->proc->index_listed, 8, app_data->ground_x + 176, 166);
+	show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_GROUND : SPRITE_GROUND, app_data->ground_x, 166);
+	show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_GROUND : SPRITE_GROUND, app_data->ground_x + 176, 166);
 
-	show_elf_res_by_id(app_data->proc->index_listed, 7, 71, 73);
-	show_elf_res_by_id(app_data->proc->index_listed, 3, 12, 133 - app_data->jump_shift);
+	show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_RESTART_BUTTON : SPRITE_RESTART_BUTTON, 71, 73);
+	show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_DINO_DAMAGED : SPRITE_DINO_DAMAGED, 12, 133 - app_data->jump_shift);
 
-	switch (app_data->cactus_type) {
-		case CACTUS_BIG:
-			show_elf_res_by_id(app_data->proc->index_listed, 4, app_data->cactus_x, 130);
-			break;
-		case CACTUS_SMALL:
-			show_elf_res_by_id(app_data->proc->index_listed, 5, app_data->cactus_x, 143);
-			break;
-	}
+	if (app_data->is_cactus_show)
+		switch (app_data->cactus_type) {
+			case CACTUS_BIG:
+				show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_CACTUS_BIG : SPRITE_CACTUS_BIG, app_data->cactus_x, 130);
+				break;
 
-	show_elf_res_by_id(app_data->proc->index_listed, 6, app_data->cloud_x, app_data->cloud_y);
+			case CACTUS_SMALL:
+				show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_CACTUS_SMALL : SPRITE_CACTUS_SMALL, app_data->cactus_x, 143);
+				break;
+		}
+
+	if (app_data->is_bird_show)
+		switch (app_data->bird_sptite) {
+			case SPRITE_BIRD_FLY_1:
+				show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_BIRD_FLY_1 : SPRITE_BIRD_FLY_1, app_data->bird_x, app_data->bird_y);
+				break;
+			case SPRITE_BIRD_FLY_2:
+				show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_BIRD_FLY_2 : SPRITE_BIRD_FLY_2, app_data->bird_x, app_data->bird_y);
+				break;
+		}
+
+	show_elf_res_by_id(app_data->proc->index_listed, app_data->is_night ? SPRITE_NIGHT_CLOUD : SPRITE_CLOUD, app_data->cloud_x, app_data->cloud_y);
 
 	repaint_screen_lines(1, 176);
 }
@@ -575,7 +924,19 @@ void draw_settings_screen() {
 	else
 		text_out_center("Vibration: [Off]", 88, 35);
 
-	text_out_center("TRex 1.0", 88, 120);
+	switch (app_data->map_type) {
+		case MAP_TYPE_CLASSIC:
+			text_out_center("Mode: [Classic]", 88, 65);
+			break;
+		case MAP_TYPE_DAY:
+			text_out_center("Mode: [Day]", 88, 65);
+			break;
+		case MAP_TYPE_NIGHT:
+			text_out_center("Mode: [Night]", 88, 65);
+			break;
+	}
+
+	text_out_center("TRex 1.1", 88, 120);
 	text_out_center("By Yuukari", 88, 140);
 
 	repaint_screen_lines(1, 176);
